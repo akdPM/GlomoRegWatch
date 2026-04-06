@@ -19,6 +19,7 @@ export default function Dashboard() {
     const [loading, setLoading] = useState(true);
     const [ingesting, setIngesting] = useState(false);
     const [creatingTickets, setCreatingTickets] = useState(false);
+    const [syncingJira, setSyncingJira] = useState(false);
     const [ticketResults, setTicketResults] = useState<{key: string, url: string, task: string}[] | null>(null);
 
     // Filters
@@ -61,6 +62,27 @@ export default function Dashboard() {
             console.error("Ingestion failed", error);
         }
         setIngesting(false);
+    };
+
+    const handleSyncJira = async () => {
+        setSyncingJira(true);
+        try {
+            const res = await fetch('/api/tickets/sync', { method: 'POST' });
+            const json = await res.json();
+            if (json.success) {
+                if (json.updated_count > 0) {
+                    alert(`Synced successfully! ${json.updated_count} document(s) marked as Reviewed.`);
+                    await fetchDocuments();
+                } else {
+                    alert('Jira is completely synced. No pending tickets were marked as Done.');
+                }
+            } else {
+                alert(json.error || 'Failed to sync with Jira.');
+            }
+        } catch (error) {
+            console.error("Jira sync failed", error);
+        }
+        setSyncingJira(false);
     };
 
     const handleUpdateStatus = async (id: string, newStatus: string) => {
@@ -230,9 +252,9 @@ export default function Dashboard() {
                         <option value="reviewed">Reviewed</option>
                     </select>
                 </div>
-                <div className="flex gap-3 w-full sm:w-auto">
-                    <button className="flex items-center gap-2 bg-white text-slate-700 text-sm font-medium py-2 px-4 rounded-lg border border-gray-200 hover:bg-gray-50 transition">
-                        <Upload className="w-4 h-4" /> Upload
+                <div className="flex flex-wrap gap-3 w-full sm:w-auto">
+                    <button onClick={handleSyncJira} disabled={syncingJira} className="flex items-center gap-2 bg-white text-violet-700 border-violet-200 hover:border-violet-300 hover:bg-violet-50 text-sm font-medium py-2 px-4 rounded-lg border transition disabled:opacity-70">
+                        <CheckCircle2 className={`w-4 h-4 ${syncingJira ? 'animate-pulse' : ''}`} /> {syncingJira ? 'Syncing...' : 'Sync Jira'}
                     </button>
                     <button onClick={handleIngest} disabled={ingesting} className="flex items-center gap-2 bg-blue-600 text-white text-sm font-medium py-2 px-4 rounded-lg hover:bg-blue-700 transition disabled:opacity-70 disabled:cursor-not-allowed uppercase tracking-wider">
                         <RefreshCcw className={`w-4 h-4 ${ingesting ? 'animate-spin' : ''}`} /> {ingesting ? 'Fetching...' : 'Fetch Now'}
