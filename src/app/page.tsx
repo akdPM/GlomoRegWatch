@@ -26,7 +26,7 @@ export default function Dashboard() {
     // Jira Assignment Modal state
     const [assignmentModal, setAssignmentModal] = useState<Document | null>(null);
     const [jiraUsers, setJiraUsers] = useState<{accountId: string, displayName: string, avatarUrls: any}[]>([]);
-    const [assignments, setAssignments] = useState<Record<number, string>>({}); // { itemIndex: accountId }
+    const [assignments, setAssignments] = useState<Record<number, {accountId: string, displayName: string}>>({});
     const [loadingUsers, setLoadingUsers] = useState(false);
 
     const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
@@ -126,7 +126,7 @@ export default function Dashboard() {
         setLoadingUsers(false);
     };
 
-    const handleCreateTickets = async (doc: Document, resolvedAssignments: Record<number, string>) => {
+    const handleCreateTickets = async (doc: Document, resolvedAssignments: Record<number, string>, resolvedNames: Record<number, string> = {}) => {
         if (!doc.action_items || doc.action_items.length === 0) return;
         setCreatingTickets(true);
         setTicketResults(null);
@@ -139,7 +139,8 @@ export default function Dashboard() {
                     action_items: doc.action_items,
                     circular_title: doc.title,
                     circular_url: doc.source_url,
-                    assignments: resolvedAssignments
+                    assignments: resolvedAssignments,
+                    assigneeNames: resolvedNames
                 })
             });
             const json = await res.json();
@@ -525,7 +526,13 @@ export default function Dashboard() {
                                                                 </span>
                                                             )}{action.task || (action as any).item}</p>
                                                         <div className="flex items-center gap-3 text-xs font-semibold text-slate-500">
-                                                            <span className="bg-slate-100 px-2 py-1 rounded">Owner: {action.owner}</span>
+                                                            {(action as any).jira_key ? (
+                                                                (action as any).assignee_name
+                                                                    ? <span className="bg-violet-50 text-violet-800 border border-violet-200 px-2 py-1 rounded font-semibold">{(action as any).assignee_name}</span>
+                                                                    : <span className="bg-slate-100 text-slate-400 px-2 py-1 rounded italic">Unassigned</span>
+                                                            ) : (
+                                                                <span className="bg-slate-100 px-2 py-1 rounded">Owner: {action.owner}</span>
+                                                            )}
                                                             <span className="bg-red-50 text-red-600 px-2 py-1 rounded border border-red-100 flex items-center gap-1"><Clock className="w-3 h-3"/> {action.due_date}</span>
                                                             {(action as any).jira_key && (
                                                                 <div className="flex items-center gap-2">
@@ -660,8 +667,15 @@ export default function Dashboard() {
                                         <div className="flex items-center gap-2 mt-2">
                                             <span className="text-xs text-slate-400 font-medium flex-shrink-0">Assign to:</span>
                                             <select
-                                                value={assignments[idx] || ''}
-                                                onChange={e => setAssignments(prev => ({ ...prev, [idx]: e.target.value }))}
+                                                value={assignments[idx]?.accountId || ''}
+                                                onChange={e => {
+                                                    const user = jiraUsers.find(u => u.accountId === e.target.value);
+                                                    if (user) {
+                                                        setAssignments(prev => ({ ...prev, [idx]: { accountId: user.accountId, displayName: user.displayName } }));
+                                                    } else {
+                                                        setAssignments(prev => { const n = {...prev}; delete n[idx]; return n; });
+                                                    }
+                                                }}
                                                 className="flex-1 text-sm bg-white border border-slate-200 rounded-lg px-3 py-2 text-slate-700 focus:ring-2 focus:ring-violet-400 focus:border-transparent outline-none"
                                             >
                                                 <option value="">Unassigned</option>
@@ -684,9 +698,16 @@ export default function Dashboard() {
                                 <button
                                     onClick={async () => {
                                         const doc = assignmentModal;
-                                        const resolvedAssignments = { ...assignments };
+                                        const resolvedAssignments: Record<number, string> = {};
+                                        const resolvedNames: Record<number, string> = {};
+                                        Object.entries(assignments).forEach(([k, v]) => {
+                                            if (v) {
+                                                resolvedAssignments[Number(k)] = (v as any).accountId;
+                                                resolvedNames[Number(k)] = (v as any).displayName;
+                                            }
+                                        });
                                         setAssignmentModal(null);
-                                        await handleCreateTickets(doc, resolvedAssignments);
+                                        await handleCreateTickets(doc, resolvedAssignments, resolvedNames);
                                     }}
                                     disabled={creatingTickets || loadingUsers}
                                     className="px-5 py-2.5 rounded-xl text-sm font-bold text-white bg-violet-600 hover:bg-violet-700 transition flex items-center gap-2 disabled:opacity-50"

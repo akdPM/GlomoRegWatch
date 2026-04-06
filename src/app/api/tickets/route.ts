@@ -111,7 +111,7 @@ export async function POST(request: Request) {
 
     try {
         // `assignments` is a map of { [actionItemIndex]: accountId } from the modal
-        const { action_items, circular_title, circular_url, document_id, assignments = {} } = await request.json();
+        const { action_items, circular_title, circular_url, document_id, assignments = {}, assigneeNames = {} } = await request.json();
 
         if (!action_items || action_items.length === 0) {
             return NextResponse.json({ success: false, error: 'No action items provided' }, { status: 400 });
@@ -142,7 +142,8 @@ export async function POST(request: Request) {
                 action_items: action_items.map((item: ActionItem, i: number) => ({
                     ...item,
                     jira_key: created[i]?.key || null,
-                    jira_url: created[i]?.url || null
+                    jira_url: created[i]?.url || null,
+                    assignee_name: assigneeNames[i] || null  // Real person's display name
                 }))
             }).eq('id', document_id);
             console.log(`Stored Jira keys ${ticketKeys.join(', ')} on document ${document_id}`);
