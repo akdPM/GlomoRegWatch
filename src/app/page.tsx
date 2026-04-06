@@ -23,6 +23,12 @@ export default function Dashboard() {
     const [ticketResults, setTicketResults] = useState<{key: string, url: string, task: string}[] | null>(null);
     const [toast, setToast] = useState<{message: string, type: 'success' | 'error' | 'info'} | null>(null);
 
+    // Jira Assignment Modal state
+    const [assignmentModal, setAssignmentModal] = useState<Document | null>(null);
+    const [jiraUsers, setJiraUsers] = useState<{accountId: string, displayName: string, avatarUrls: any}[]>([]);
+    const [assignments, setAssignments] = useState<Record<number, string>>({}); // { itemIndex: accountId }
+    const [loadingUsers, setLoadingUsers] = useState(false);
+
     const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
         setToast({ message, type });
         setTimeout(() => setToast(null), 4000);
@@ -105,7 +111,22 @@ export default function Dashboard() {
         }
     };
 
-    const handleCreateTickets = async (doc: Document) => {
+    const handleOpenAssignmentModal = async (doc: Document) => {
+        if (!doc.action_items || doc.action_items.length === 0) return;
+        setAssignmentModal(doc);
+        setAssignments({});
+        setLoadingUsers(true);
+        try {
+            const res = await fetch('/api/jira/users');
+            const json = await res.json();
+            if (json.success) setJiraUsers(json.users);
+        } catch (e) {
+            showToast('Failed to load Jira users.', 'error');
+        }
+        setLoadingUsers(false);
+    };
+
+    const handleCreateTickets = async (doc: Document, resolvedAssignments: Record<number, string>) => {
         if (!doc.action_items || doc.action_items.length === 0) return;
         setCreatingTickets(true);
         setTicketResults(null);
@@ -117,7 +138,8 @@ export default function Dashboard() {
                     document_id: doc.id,
                     action_items: doc.action_items,
                     circular_title: doc.title,
-                    circular_url: doc.source_url
+                    circular_url: doc.source_url,
+                    assignments: resolvedAssignments
                 })
             });
             const json = await res.json();
@@ -557,9 +579,9 @@ export default function Dashboard() {
                                             </button>
                                         )}
                                         {selectedDoc.action_items && selectedDoc.action_items.length > 0 && (
-                                            !selectedDoc.action_items.some((a: any) => a.jira_key) ? (
+                                            !selectedDoc.action_items?.some((a: any) => a.jira_key) ? (
                                                 <button 
-                                                    onClick={() => handleCreateTickets(selectedDoc)}
+                                                    onClick={() => handleOpenAssignmentModal(selectedDoc)}
                                                     disabled={creatingTickets}
                                                     className="flex-1 sm:flex-none bg-violet-600 hover:bg-violet-700 disabled:opacity-60 text-white font-semibold py-3 px-6 rounded-xl transition flex justify-center items-center gap-2"
                                                 >
@@ -597,6 +619,85 @@ export default function Dashboard() {
                 </div>
 
             </div>
+
+            {/* Jira Assignment Modal */}
+            {assignmentModal && (
+                <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => !creatingTickets && setAssignmentModal(null)}>
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+                        {/* Modal Header */}
+                        <div className="px-8 py-6 border-b border-slate-100 flex items-start justify-between gap-4">
+                            <div>
+                                <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                                    <ArrowRight className="w-5 h-5 text-violet-600" /> Assign Jira Tickets
+                                </h2>
+                                <p className="text-sm text-slate-500 mt-1 leading-snug max-w-md line-clamp-2">{assignmentModal.title}</p>
+                            </div>
+                            <button onClick={() => setAssignmentModal(null)} className="text-slate-400 hover:text-slate-700 text-2xl leading-none mt-0.5">&times;</button>
+                        </div>
+                        {/* Action Items Assignment */}
+                        <div className="px-8 py-6 flex flex-col gap-4">
+                            {loadingUsers ? (
+                                <div className="text-center py-8 text-slate-400">Fetching Jira members…</div>
+                            ) : (
+                                assignmentModal.action_items?.map((action, idx) => (
+                                    <div key={idx} className={`p-4 rounded-xl border-2 transition ${
+                                        assignments[idx] ? 'border-violet-200 bg-violet-50/50' : 'border-slate-100 bg-slate-50'
+                                    }`}>
+                                        <div className="flex items-start gap-3 mb-3">
+                                            <div className={`mt-0.5 w-4 h-4 rounded-full border-2 flex-shrink-0 ${
+                                                assignments[idx] ? 'border-violet-500 bg-violet-500' : 'border-slate-300'
+                                            }`}/>
+                                            <div className="flex-1">
+                                                {(action as any).severity && (
+                                                    <span className={`inline-block mr-2 px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider
+                                                        ${(action as any).severity?.toLowerCase() === 'high' ? 'bg-red-100 text-red-700' : (action as any).severity?.toLowerCase() === 'medium' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                                                        {(action as any).severity}
+                                                    </span>
+                                                )}
+                                                <p className="text-sm font-semibold text-slate-800 inline">{action.task}</p>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-2 mt-2">
+                                            <span className="text-xs text-slate-400 font-medium flex-shrink-0">Assign to:</span>
+                                            <select
+                                                value={assignments[idx] || ''}
+                                                onChange={e => setAssignments(prev => ({ ...prev, [idx]: e.target.value }))}
+                                                className="flex-1 text-sm bg-white border border-slate-200 rounded-lg px-3 py-2 text-slate-700 focus:ring-2 focus:ring-violet-400 focus:border-transparent outline-none"
+                                            >
+                                                <option value="">Unassigned</option>
+                                                {jiraUsers.map(u => (
+                                                    <option key={u.accountId} value={u.accountId}>{u.displayName}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    </div>
+                                ))
+                            )}
+                        </div>
+                        {/* Modal Footer */}
+                        <div className="px-8 py-5 border-t border-slate-100 flex items-center justify-between gap-4">
+                            <p className="text-xs text-slate-400">{Object.values(assignments).filter(Boolean).length} of {assignmentModal.action_items?.length} tasks assigned</p>
+                            <div className="flex gap-3">
+                                <button onClick={() => setAssignmentModal(null)} disabled={creatingTickets} className="px-5 py-2.5 rounded-xl text-sm font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 transition disabled:opacity-50">
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={async () => {
+                                        const doc = assignmentModal;
+                                        const resolvedAssignments = { ...assignments };
+                                        setAssignmentModal(null);
+                                        await handleCreateTickets(doc, resolvedAssignments);
+                                    }}
+                                    disabled={creatingTickets || loadingUsers}
+                                    className="px-5 py-2.5 rounded-xl text-sm font-bold text-white bg-violet-600 hover:bg-violet-700 transition flex items-center gap-2 disabled:opacity-50"
+                                >
+                                    <ArrowRight className="w-4 h-4" /> {creatingTickets ? 'Creating…' : `Create ${assignmentModal.action_items?.length} Ticket${(assignmentModal.action_items?.length || 0) > 1 ? 's' : ''}`}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Custom Scrollbar CSS */}
             <style dangerouslySetInnerHTML={{__html: `

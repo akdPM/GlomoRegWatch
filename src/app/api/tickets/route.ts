@@ -22,11 +22,15 @@ function getPriority(severity: string): string {
     }
 }
 
-async function createJiraTicket(actionItem: ActionItem, circularTitle: string, circularUrl: string) {
+async function createJiraTicket(
+    actionItem: ActionItem & { assigneeAccountId?: string },
+    circularTitle: string,
+    circularUrl: string
+) {
     const auth = Buffer.from(`${JIRA_EMAIL}:${JIRA_API_TOKEN}`).toString('base64');
 
-    // Resolve assignee from owner name
-    const assigneeId = OWNER_JIRA_MAP[actionItem.owner] || null;
+    // Use explicitly passed accountId first, then fall back to the static map
+    const assigneeId = actionItem.assigneeAccountId || OWNER_JIRA_MAP[actionItem.owner] || null;
 
     // Build epic link if configured
     const epicFields: Record<string, any> = {};
@@ -92,7 +96,8 @@ async function createJiraTicket(actionItem: ActionItem, circularTitle: string, c
         key: result.key,
         url: `${JIRA_BASE_URL}/browse/${result.key}`,
         task: actionItem.task,
-        assignee: actionItem.owner
+        assignee: actionItem.owner,
+        assigneeAccountId: assigneeId
     };
 }
 
@@ -105,14 +110,21 @@ export async function POST(request: Request) {
     }
 
     try {
-        const { action_items, circular_title, circular_url, document_id } = await request.json();
+        // `assignments` is a map of { [actionItemIndex]: accountId } from the modal
+        const { action_items, circular_title, circular_url, document_id, assignments = {} } = await request.json();
 
         if (!action_items || action_items.length === 0) {
             return NextResponse.json({ success: false, error: 'No action items provided' }, { status: 400 });
         }
 
+        // Merge the per-task assignee accountId into each action item
+        const itemsWithAssignees = action_items.map((item: ActionItem, i: number) => ({
+            ...item,
+            assigneeAccountId: assignments[i] || null
+        }));
+
         const results = await Promise.allSettled(
-            action_items.map((item: ActionItem) => createJiraTicket(item, circular_title, circular_url))
+            itemsWithAssignees.map((item: any) => createJiraTicket(item, circular_title, circular_url))
         );
 
         const created = results
