@@ -11,7 +11,8 @@ type ActionItem = { task: string, owner: string, due_date: string; severity?: st
 type Document = {
     id: string; source: string; title: string; source_url: string; pdf_url?: string; published_at: string;
     summary?: string; relevance_score?: string; why_it_matters?: string;
-    action_items?: ActionItem[]; evidence_excerpt?: string; status: 'fetched' | 'analyzed' | 'reviewed';
+    action_items?: ActionItem[]; evidence_excerpt?: string;
+    status: 'fetched' | 'analyzed' | 'under_review' | 'action_required' | 'reviewed';
 };
 
 export default function Dashboard() {
@@ -28,6 +29,9 @@ export default function Dashboard() {
     const [jiraUsers, setJiraUsers] = useState<{accountId: string, displayName: string, avatarUrls: any}[]>([]);
     const [assignments, setAssignments] = useState<Record<number, {accountId: string, displayName: string}>>({});
     const [loadingUsers, setLoadingUsers] = useState(false);
+
+    // Activity log
+    const [activityLogs, setActivityLogs] = useState<{id: string, action: string, actor: string, created_at: string}[]>([]);
 
     const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
         setToast({ message, type });
@@ -64,9 +68,15 @@ export default function Dashboard() {
         fetchDocuments();
     }, [sourceFilter, relevanceFilter, statusFilter]);
 
-    // Clear ticket results when user switches circular
+    // Clear ticket results when user switches circular, and load activity log
     useEffect(() => {
         setTicketResults(null);
+        if (selectedId) {
+            fetch(`/api/activity/${selectedId}`)
+                .then(r => r.json())
+                .then(j => { if (j.success) setActivityLogs(j.logs); })
+                .catch(() => {});
+        }
     }, [selectedId]);
 
     const handleIngest = async () => {
@@ -210,6 +220,24 @@ export default function Dashboard() {
         catch { return dateString; }
     };
 
+    const isOverdue = (dueDateStr: string, status?: string) => {
+        if (!dueDateStr || ['done', 'closed', 'resolved', 'complete'].includes((status || '').toLowerCase())) return false;
+        try {
+            const d = new Date(dueDateStr);
+            return !isNaN(d.getTime()) && d < new Date();
+        } catch { return false; }
+    };
+
+    const getStatusStyle = (status: string) => {
+        switch (status) {
+            case 'reviewed':       return { color: 'text-emerald-500', label: 'Reviewed', icon: CheckCircle };
+            case 'action_required': return { color: 'text-red-600', label: 'Action Required', icon: AlertTriangle };
+            case 'under_review':   return { color: 'text-blue-500', label: 'Under Review', icon: Clock };
+            case 'analyzed':       return { color: 'text-blue-500', label: 'Analyzed', icon: Circle };
+            default:               return { color: 'text-slate-400', label: 'Fetched', icon: Circle };
+        }
+    };
+
     return (
         <div className="min-h-screen bg-[#f8fafc] text-slate-800 font-sans flex flex-col p-4 md:p-6 lg:px-8 xl:px-12 max-w-[1600px] mx-auto relative">
             
@@ -313,6 +341,8 @@ export default function Dashboard() {
                         <option value="All Status">All Status</option>
                         <option value="fetched">Fetched</option>
                         <option value="analyzed">Analyzed</option>
+                        <option value="under_review">Under Review</option>
+                        <option value="action_required">Action Required</option>
                         <option value="reviewed">Reviewed</option>
                     </select>
                 </div>
@@ -368,10 +398,15 @@ export default function Dashboard() {
                                             );
                                         })()}
                                         <div className="flex-1"></div>
-                                        <span className={`flex items-center gap-1 capitalize ${isReviewed ? 'text-emerald-500' : 'text-blue-500'}`}>
-                                            {isReviewed ? <CheckCircle className="w-3.5 h-3.5" /> : <Circle className="w-3.5 h-3.5" />}
-                                            {doc.status}
-                                        </span>
+                                        {(() => {
+                                            const { color, label, icon: StatusIcon } = getStatusStyle(doc.status);
+                                            return (
+                                                <span className={`flex items-center gap-1 ${color}`}>
+                                                    <StatusIcon className="w-3.5 h-3.5" />
+                                                    {label}
+                                                </span>
+                                            );
+                                        })()}
                                     </div>
                                     <h3 className="font-bold text-slate-800 text-sm leading-snug mb-3">
                                         {doc.title}
@@ -539,7 +574,14 @@ export default function Dashboard() {
                                                             ) : (
                                                                 <span className="bg-slate-100 px-2 py-1 rounded">Owner: {action.owner}</span>
                                                             )}
-                                                            <span className="bg-red-50 text-red-600 px-2 py-1 rounded border border-red-100 flex items-center gap-1"><Clock className="w-3 h-3"/> {action.due_date}</span>
+                                                            <span className={`px-2 py-1 rounded border flex items-center gap-1 ${
+                                                                isOverdue(action.due_date, (action as any).status)
+                                                                    ? 'bg-red-100 text-red-700 border-red-300 font-bold animate-pulse'
+                                                                    : 'bg-red-50 text-red-600 border-red-100'
+                                                            }`}>
+                                                                <Clock className="w-3 h-3"/>
+                                                                {isOverdue(action.due_date, (action as any).status) ? '⚠ OVERDUE · ' : ''}{action.due_date}
+                                                            </span>
                                                             {(action as any).jira_key && (
                                                                 <div className="flex items-center gap-2">
                                                                     <a 
@@ -573,24 +615,45 @@ export default function Dashboard() {
                                     )}
                                 </div>
 
+                                {/* Activity Log */}
+                                {activityLogs.length > 0 && (
+                                    <div className="mt-6 mb-2">
+                                        <h3 className="flex items-center gap-2 text-xs font-bold text-gray-400 tracking-widest uppercase mb-3">
+                                            <Clock className="w-4 h-4 text-blue-400"/> Activity Log
+                                        </h3>
+                                        <div className="flex flex-col gap-2">
+                                            {activityLogs.map(log => (
+                                                <div key={log.id} className="flex items-start gap-3 text-xs text-slate-500 border-l-2 border-slate-200 pl-3 py-1">
+                                                    <div className="flex-1">
+                                                        <span className="font-semibold text-slate-700">{log.actor}</span> · {log.action}
+                                                    </div>
+                                                    <span className="text-slate-400 flex-shrink-0">{format(new Date(log.created_at), 'dd MMM, HH:mm')}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
                                 {/* Bottom Actions */}
                                 <div className="pt-4 mt-auto flex flex-col gap-3">
-                                    <div className="flex flex-wrap gap-3">
-                                        {!isReviewed ? (
-                                            <button 
-                                                onClick={() => handleUpdateStatus(selectedDoc.id, 'reviewed')}
-                                                className="flex-1 sm:flex-none bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-xl transition flex justify-center items-center gap-2 shadow-sm shadow-blue-200"
-                                            >
-                                                <CheckCircle2 className="w-5 h-5"/> Mark as Reviewed
-                                            </button>
-                                        ) : (
-                                            <button 
-                                                onClick={() => handleUpdateStatus(selectedDoc.id, 'analyzed')}
-                                                className="flex-1 sm:flex-none bg-gray-100 hover:bg-gray-200 text-slate-700 font-semibold py-3 px-6 rounded-xl transition flex justify-center items-center gap-2"
-                                            >
-                                                <Circle className="w-5 h-5"/> Unmark Reviewed
-                                            </button>
-                                        )}
+                                    <div className="flex flex-wrap gap-3 items-center">
+                                        <span className="text-sm font-semibold text-slate-500 mr-1">Status:</span>
+                                        <select
+                                            value={selectedDoc.status}
+                                            onChange={e => handleUpdateStatus(selectedDoc.id, e.target.value)}
+                                            className={`text-sm font-bold px-4 py-2.5 rounded-xl border outline-none cursor-pointer ${
+                                                selectedDoc.status === 'reviewed' ? 'bg-emerald-50 text-emerald-700 border-emerald-300'
+                                                : selectedDoc.status === 'action_required' ? 'bg-red-50 text-red-700 border-red-300'
+                                                : selectedDoc.status === 'under_review' ? 'bg-blue-50 text-blue-700 border-blue-300'
+                                                : 'bg-slate-100 text-slate-700 border-slate-200'
+                                            }`}
+                                        >
+                                            <option value="fetched">📥 Fetched</option>
+                                            <option value="analyzed">🔍 Analyzed</option>
+                                            <option value="under_review">👀 Under Review</option>
+                                            <option value="action_required">🚨 Action Required</option>
+                                            <option value="reviewed">✅ Reviewed</option>
+                                        </select>
                                         {selectedDoc.action_items && selectedDoc.action_items.length > 0 && (
                                             !selectedDoc.action_items?.some((a: any) => a.jira_key) ? (
                                                 <button 

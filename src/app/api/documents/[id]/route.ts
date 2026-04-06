@@ -6,13 +6,13 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     try {
         const { id } = await context.params;
         const body = await request.json();
-        const { status } = body;
+        const { status, actor = 'Compliance Team' } = body;
 
         if (!status) {
             return NextResponse.json({ error: 'Status is required' }, { status: 400 });
         }
 
-        // Fetch current doc to get slack_thread_ts and title
+        // Fetch current doc to get slack_thread_ts, title, and old status
         const { data: existing } = await supabase
             .from('documents')
             .select('id, title, slack_thread_ts, status')
@@ -27,6 +27,14 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
             .single();
 
         if (error) throw error;
+
+        // Write an activity log entry
+        await supabase.from('activity_logs').insert({
+            document_id: id,
+            action: `Status changed from "${existing?.status}" to "${status}"`,
+            actor,
+            created_at: new Date().toISOString()
+        });
 
         // Post thread reply when status changes to 'reviewed'
         if (existing?.slack_thread_ts && status === 'reviewed' && existing.status !== 'reviewed') {

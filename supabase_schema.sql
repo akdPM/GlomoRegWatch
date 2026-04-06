@@ -28,3 +28,13 @@ CREATE TABLE IF NOT EXISTS sync_logs (
     new_documents_added INTEGER DEFAULT 0,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+CREATE TABLE IF NOT EXISTS activity_logs (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    document_id UUID REFERENCES documents(id) ON DELETE CASCADE,
+    action TEXT NOT NULL,
+    actor TEXT DEFAULT 'System',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS activity_logs_document_id_idx ON activity_logs(document_id);
