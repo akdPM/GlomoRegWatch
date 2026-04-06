@@ -487,6 +487,16 @@ export default function Dashboard() {
                                                         <div className="flex items-center gap-3 text-xs font-semibold text-slate-500">
                                                             <span className="bg-slate-100 px-2 py-1 rounded">Owner: {action.owner}</span>
                                                             <span className="bg-red-50 text-red-600 px-2 py-1 rounded border border-red-100 flex items-center gap-1"><Clock className="w-3 h-3"/> {action.due_date}</span>
+                                                            {(action as any).jira_key && (
+                                                                <a 
+                                                                    href={(action as any).jira_url} 
+                                                                    target="_blank" 
+                                                                    rel="noreferrer" 
+                                                                    className="bg-violet-50 text-violet-700 px-2 py-1 rounded border border-violet-200 hover:underline hover:bg-violet-100 transition-colors flex items-center gap-1"
+                                                                >
+                                                                    {(action as any).jira_key}
+                                                                </a>
+                                                            )}
                                                         </div>
                                                     </div>
                                                 </div>
@@ -516,16 +526,22 @@ export default function Dashboard() {
                                             </button>
                                         )}
                                         {selectedDoc.action_items && selectedDoc.action_items.length > 0 && (
-                                            <button 
-                                                onClick={() => handleCreateTickets(selectedDoc)}
-                                                disabled={creatingTickets}
-                                                className="flex-1 sm:flex-none bg-violet-600 hover:bg-violet-700 disabled:opacity-60 text-white font-semibold py-3 px-6 rounded-xl transition flex justify-center items-center gap-2"
-                                            >
-                                                <ArrowRight className="w-5 h-5"/> {creatingTickets ? 'Creating Tickets...' : `Create ${selectedDoc.action_items.length} Jira Ticket${selectedDoc.action_items.length > 1 ? 's' : ''}`}
-                                            </button>
+                                            !selectedDoc.action_items.some((a: any) => a.jira_key) ? (
+                                                <button 
+                                                    onClick={() => handleCreateTickets(selectedDoc)}
+                                                    disabled={creatingTickets}
+                                                    className="flex-1 sm:flex-none bg-violet-600 hover:bg-violet-700 disabled:opacity-60 text-white font-semibold py-3 px-6 rounded-xl transition flex justify-center items-center gap-2"
+                                                >
+                                                    <ArrowRight className="w-5 h-5"/> {creatingTickets ? 'Creating Tickets...' : `Create ${selectedDoc.action_items.length} Jira Ticket${selectedDoc.action_items.length > 1 ? 's' : ''}`}
+                                                </button>
+                                            ) : (
+                                                <div className="flex-1 sm:flex-none flex justify-center items-center gap-2 bg-emerald-50 text-emerald-700 font-bold py-3 px-6 rounded-xl border border-emerald-200 shadow-sm">
+                                                    <CheckCircle2 className="w-5 h-5"/> {selectedDoc.action_items.length} Active Jira Ticket{selectedDoc.action_items.length > 1 ? 's' : ''}
+                                                </div>
+                                            )
                                         )}
                                     </div>
-                                    {ticketResults && ticketResults.length > 0 && (
+                                    {ticketResults && ticketResults.length > 0 && !selectedDoc.action_items.some((a: any) => a.jira_key) && (
                                         <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4">
                                             <p className="text-emerald-700 font-semibold text-sm mb-2">✅ {ticketResults.length} Jira ticket{ticketResults.length > 1 ? 's' : ''} created!</p>
                                             <div className="flex flex-wrap gap-2">
