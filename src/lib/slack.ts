@@ -49,11 +49,18 @@ async function postSlackMessage(payload: object): Promise<string | null> {
   } else if (webhookUrl) {
     // Fallback: Incoming Webhook (no thread ts returned)
     try {
-      await fetch(webhookUrl, {
+      // Incoming Webhooks often reject payloads that try to override the channel, so we strip it.
+      const webhookPayload = { ...payload };
+      delete (webhookPayload as any).channel;
+
+      const res = await fetch(webhookUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+        body: JSON.stringify(webhookPayload)
       });
+      if (!res.ok) {
+        console.warn(`Slack Webhook returned ${res.status}:`, await res.text());
+      }
     } catch (err: any) {
       console.warn('Slack webhook error:', err.message);
     }
