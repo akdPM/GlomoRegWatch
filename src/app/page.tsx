@@ -474,12 +474,20 @@ export default function Dashboard() {
                                             {selectedDoc.action_items.map((action, idx) => (
                                                 <div key={idx} className="flex items-start gap-4 p-4 border border-gray-100 rounded-xl bg-white hover:bg-gray-50 transition">
                                                     <div className="mt-1">
-                                                        <div className="w-4 h-4 rounded-full border-2 border-red-500"></div>
+                                                        {['done', 'closed', 'resolved', 'complete'].includes(((action as any).status || '').toLowerCase()) ? (
+                                                            <CheckCircle2 className="w-5 h-5 text-emerald-500" />
+                                                        ) : (
+                                                            <div className="w-4 h-4 rounded-full border-2 border-red-500"></div>
+                                                        )}
                                                     </div>
                                                     <div className="flex-1">
-                                                        <p className="text-sm font-medium text-slate-800 mb-2">
+                                                        <p className={`text-sm font-medium mb-2 transition-all ${
+                                                            ['done', 'closed', 'resolved', 'complete'].includes(((action as any).status || '').toLowerCase()) 
+                                                                ? 'text-slate-400 line-through' 
+                                                                : 'text-slate-800'
+                                                        }`}>
                                                             {action.severity && (
-                                                                <span className={`inline-block mr-2 px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider
+                                                                <span className={`inline-block mr-2 px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider no-underline
                                                                     ${action.severity.toLowerCase() === 'high' ? 'bg-red-100 text-red-700' : action.severity.toLowerCase() === 'medium' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
                                                                     {action.severity} Priority
                                                                 </span>

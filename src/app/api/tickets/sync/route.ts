@@ -37,40 +37,57 @@ export async function POST() {
             const jiraKeys = actionItems.map((item: any) => item.jira_key).filter(Boolean);
             if (jiraKeys.length === 0) continue;
 
-            // Check status of each ticket in Jira
             let allDone = true;
-            for (const key of jiraKeys) {
-                const res = await fetch(`${JIRA_BASE_URL}/rest/api/3/issue/${key}?fields=status`, {
-                    headers: { 'Authorization': `Basic ${auth}`, 'Accept': 'application/json' }
+            let itemsModified = false;
+
+            for (const item of actionItems) {
+                if (!item.jira_key) {
+                    allDone = false;
+                    continue;
+                }
+
+                const res = await fetch(`${JIRA_BASE_URL}/rest/api/3/issue/${item.jira_key}?fields=status`, {
+                    headers: { 'Authorization': `Basic ${auth}`, 'Accept': 'application/json' },
+                    cache: 'no-store'
                 });
 
                 if (res.ok) {
                     const json = await res.json();
                     const statusName = json.fields?.status?.name?.toLowerCase();
-                    if (!['done', 'closed', 'resolved', 'complete'].includes(statusName)) {
-                        allDone = false;
-                        break; // At least one ticket is still open
+                    const isDone = ['done', 'closed', 'resolved', 'complete'].includes(statusName);
+                    
+                    if (!isDone) allDone = false;
+
+                    // Update the individual ticket status in our JSON
+                    if (item.status !== statusName) {
+                        item.status = statusName;
+                        itemsModified = true;
                     }
                 } else {
-                    console.warn(`Failed to fetch status for Jira issue ${key}`);
+                    console.warn(`Failed to fetch status for Jira issue ${item.jira_key}`);
                     allDone = false; // Err on side of caution
                 }
             }
 
-            if (allDone) {
-                console.log(`Document ${doc.id} - all tickets (${jiraKeys.join(', ')}) are DONE. Marking as reviewed.`);
+            if (itemsModified || allDone) {
+                const updatePayload: any = { action_items: actionItems };
                 
+                if (allDone) {
+                    console.log(`Document ${doc.id} - all tickets are DONE. Marking as reviewed.`);
+                    updatePayload.status = 'reviewed';
+                }
+
                 await supabase
                     .from('documents')
-                    .update({ status: 'reviewed' })
+                    .update(updatePayload)
                     .eq('id', doc.id);
 
                 updatedCount++;
 
-                if (doc.slack_thread_ts) {
+                if (allDone && doc.slack_thread_ts) {
                     await sendSlackThreadReply(
                         doc.slack_thread_ts,
-                        `✅ All associated Jira tickets (${jiraKeys.join(', ')}) have been completed.\nDocument auto-marked as *Reviewed* in GlomoRegWatch.`
+                        `✅ All associated Jira tickets have been completed.\nDocument auto-marked as *Reviewed* in GlomoRegWatch.`
                     );
                 }
             }
