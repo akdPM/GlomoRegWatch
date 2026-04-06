@@ -11,10 +11,22 @@ export const dynamic = 'force-dynamic'; // Prevent Next.js POST/GET caching
 export async function POST() {
     try {
         console.log("Starting ingestion from RBI and IFSCA sources...");
-        const [rbiDocs, ifscaDocs] = await Promise.all([
-            scrapeRBI(),
-            scrapeIFSCA()
-        ]);
+        let rbiDocs: any[] = [];
+        let ifscaDocs: any[] = [];
+
+        try {
+            rbiDocs = await scrapeRBI();
+            console.log(`Successfully scraped ${rbiDocs.length} RBI circulars`);
+        } catch (e: any) {
+            console.error('RBI Scraper failed (Likely WAF IP Block):', e.message);
+        }
+
+        try {
+            ifscaDocs = await scrapeIFSCA();
+            console.log(`Successfully scraped ${ifscaDocs.length} IFSCA circulars`);
+        } catch (e: any) {
+            console.error('IFSCA Scraper failed (Likely WAF IP Block):', e.message);
+        }
         
         const allDocs = [...rbiDocs, ...ifscaDocs];
         const newlyAdded = [];
