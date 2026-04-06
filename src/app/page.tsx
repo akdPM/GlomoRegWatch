@@ -25,6 +25,7 @@ export default function Dashboard() {
     const [sourceFilter, setSourceFilter] = useState("All Sources");
     const [relevanceFilter, setRelevanceFilter] = useState("All Relevance");
     const [statusFilter, setStatusFilter] = useState("All Status");
+    const [lastSync, setLastSync] = useState<string | null>(null);
 
     const [selectedId, setSelectedId] = useState<string | null>(null);
 
@@ -35,6 +36,7 @@ export default function Dashboard() {
             const json = await res.json();
             if (json.success) {
                 setDocuments(json.data);
+                if (json.last_sync) setLastSync(json.last_sync);
                 if (json.data.length > 0 && !selectedId) {
                     setSelectedId(json.data[0].id);
                 }
@@ -159,9 +161,9 @@ export default function Dashboard() {
                         <p className="text-xs text-slate-500 font-medium">Regulatory Intelligence • GIFT City</p>
                     </div>
                 </div>
-                <div className="text-sm text-slate-500 flex items-center gap-2">
-                    <span>Last sync:</span>
-                    <span className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-emerald-500"></div> {format(new Date(), 'd MMM, hh:mm a')}</span>
+                <div className="text-sm text-slate-500 flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 text-right">
+                    <span>Last autofetch:</span>
+                    <span className="flex items-center gap-1 whitespace-nowrap"><div className="w-2 h-2 rounded-full bg-emerald-500"></div> {lastSync ? format(new Date(lastSync), 'd MMM, hh:mm a') : 'Never'}</span>
                 </div>
             </header>
 

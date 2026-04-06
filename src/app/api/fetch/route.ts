@@ -5,7 +5,8 @@ import { scrapeRBI } from '@/lib/scrapers/rbi';
 import { scrapeIFSCA } from '@/lib/scrapers/ifsca';
 import { sendSlackAlert } from '@/lib/slack';
 
-export const maxDuration = 300; // Allow up to 5 minutes for PDF fetching + AI analysis
+export const maxDuration = 60; // Max allowed duration on Vercel Hobby tier is 60s
+export const dynamic = 'force-dynamic'; // Prevent Next.js POST/GET caching
 
 export async function POST() {
     try {
@@ -109,7 +110,8 @@ export async function POST() {
             if (!updateError && analyzed) {
                     newlyAdded.push(analyzed);
                     // Fire Slack alert for High priority brand-new circulars
-                    await sendSlackAlert({
+                    const threadTs = await sendSlackAlert({
+                        id: analyzed.id,
                         title: analyzed.title,
                         source: analyzed.source,
                         source_url: analyzed.source_url,
@@ -117,10 +119,16 @@ export async function POST() {
                         why_it_matters: analyzed.why_it_matters,
                         action_items: analyzed.action_items
                     });
+                    if (threadTs) {
+                        await supabase.from('documents').update({ slack_thread_ts: threadTs }).eq('id', analyzed.id);
+                    }
                 } else {
                     newlyAdded.push(inserted);
                 }
         }
+
+        // Record the exact time this sync successfully finished
+        await supabase.from('sync_logs').insert({ status: 'success', new_documents_added: newlyAdded.length });
 
         return NextResponse.json({ success: true, count: newlyAdded.length, new_circulars: newlyAdded });
     } catch (error: any) {

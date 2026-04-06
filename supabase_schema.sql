@@ -16,7 +16,15 @@ CREATE TABLE IF NOT EXISTS documents (
     status TEXT DEFAULT 'fetched', -- fetched, analyzed, reviewed
     slack_thread_ts TEXT, -- stores Slack message ts for thread replies
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+
 );
 
 -- Run this if the table already exists to add the new column:
 -- ALTER TABLE documents ADD COLUMN IF NOT EXISTS slack_thread_ts TEXT;
+
+CREATE TABLE IF NOT EXISTS sync_logs (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    status TEXT NOT NULL,
+    new_documents_added INTEGER DEFAULT 0,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
