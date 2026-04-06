@@ -496,14 +496,27 @@ export default function Dashboard() {
                                                             <span className="bg-slate-100 px-2 py-1 rounded">Owner: {action.owner}</span>
                                                             <span className="bg-red-50 text-red-600 px-2 py-1 rounded border border-red-100 flex items-center gap-1"><Clock className="w-3 h-3"/> {action.due_date}</span>
                                                             {(action as any).jira_key && (
-                                                                <a 
-                                                                    href={(action as any).jira_url} 
-                                                                    target="_blank" 
-                                                                    rel="noreferrer" 
-                                                                    className="bg-violet-50 text-violet-700 px-2 py-1 rounded border border-violet-200 hover:underline hover:bg-violet-100 transition-colors flex items-center gap-1"
-                                                                >
-                                                                    {(action as any).jira_key}
-                                                                </a>
+                                                                <div className="flex items-center gap-2">
+                                                                    <a 
+                                                                        href={(action as any).jira_url} 
+                                                                        target="_blank" 
+                                                                        rel="noreferrer" 
+                                                                        className="bg-violet-50 text-violet-700 px-2 py-1 rounded border border-violet-200 hover:underline hover:bg-violet-100 transition-colors flex items-center gap-1"
+                                                                    >
+                                                                        {(action as any).jira_key}
+                                                                    </a>
+                                                                    {((action as any).status) && (
+                                                                        <span className={`px-2 py-1 rounded border capitalize ${
+                                                                            ['done', 'closed', 'resolved', 'complete'].includes(((action as any).status || '').toLowerCase())
+                                                                                ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                                                                : ((action as any).status || '').toLowerCase() === 'in progress'
+                                                                                ? 'bg-blue-50 text-blue-700 border-blue-200'
+                                                                                : 'bg-slate-50 text-slate-600 border-slate-200'
+                                                                        }`}>
+                                                                            {(action as any).status}
+                                                                        </span>
+                                                                    )}
+                                                                </div>
                                                             )}
                                                         </div>
                                                     </div>
