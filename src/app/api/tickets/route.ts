@@ -143,7 +143,7 @@ export async function POST(request: Request) {
                     ...item,
                     jira_key: created[i]?.key || null,
                     jira_url: created[i]?.url || null,
-                    assignee_name: assigneeNames[i] || null  // Real person's display name
+                    assignee_name: assigneeNames[String(i)] || assigneeNames[i] || null
                 }))
             }).eq('id', document_id);
             console.log(`Stored Jira keys ${ticketKeys.join(', ')} on document ${document_id}`);
