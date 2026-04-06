@@ -7,25 +7,31 @@ export async function GET() {
     try {
         console.log("Triggering explicit Slack push test...");
         
-        // Mock a high-priority document to force the webhook to fire
-        const mockThreadTs = await sendSlackAlert({
-            id: 'test-123',
-            title: 'Test Notification from Vercel Production',
-            source: 'Vercel Diagnostics',
-            source_url: 'https://glomoregwatch.vercel.app',
-            relevance_score: JSON.stringify({
-                label: 'High',
-                total: 10,
-                breakdown: { impact: 3, urgency: 3, scope: 2, confidence: 2 }
-            }),
-            why_it_matters: 'This is a diagnostic test to verify that Vercel has correctly loaded the SLACK_WEBHOOK_URL environment variables and that Slack is not rejecting the payload.',
-            action_items: [{ task: 'Verify Slack receipt', owner: 'Admin', due_date: 'Immediate', severity: 'High' }]
+        const token = process.env.SLACK_BOT_TOKEN;
+        const channel = process.env.SLACK_CHANNEL || '#compliance-alerts';
+
+        if (!token) {
+            return NextResponse.json({ success: false, error: "SLACK_BOT_TOKEN is entirely missing from process.env!" });
+        }
+
+        const res = await fetch('https://slack.com/api/chat.postMessage', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({
+                channel: channel,
+                text: "Diagnostic test from Vercel: Verifying Slack Bot Token permissions."
+            })
         });
 
+        const data = await res.json();
+
         return NextResponse.json({ 
-            success: true, 
-            message: 'Diagnostic test payload fired successfully!',
-            thread_ts_returned: mockThreadTs || 'null (used legacy webhook)'
+            success: data.ok, 
+            slack_raw_response: data,
+            message: data.ok ? "Bot Token is perfect! Threading should work." : "Bot Token failed! Look at the error above."
         });
     } catch (err: any) {
         console.error('Test Slack API error:', err);
