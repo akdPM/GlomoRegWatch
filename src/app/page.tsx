@@ -21,6 +21,12 @@ export default function Dashboard() {
     const [creatingTickets, setCreatingTickets] = useState(false);
     const [syncingJira, setSyncingJira] = useState(false);
     const [ticketResults, setTicketResults] = useState<{key: string, url: string, task: string}[] | null>(null);
+    const [toast, setToast] = useState<{message: string, type: 'success' | 'error' | 'info'} | null>(null);
+
+    const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
+        setToast({ message, type });
+        setTimeout(() => setToast(null), 4000);
+    };
 
     // Filters
     const [sourceFilter, setSourceFilter] = useState("All Sources");
@@ -71,16 +77,17 @@ export default function Dashboard() {
             const json = await res.json();
             if (json.success) {
                 if (json.updated_count > 0) {
-                    alert(`Synced successfully! ${json.updated_count} document(s) marked as Reviewed.`);
+                    showToast(`Synced successfully! ${json.updated_count} circular(s) marked as Reviewed.`, 'success');
                     await fetchDocuments();
                 } else {
-                    alert('Jira is completely synced. No pending tickets were marked as Done.');
+                    showToast('Jira is completely synced. No pending tickets were marked as Done.', 'info');
                 }
             } else {
-                alert(json.error || 'Failed to sync with Jira.');
+                showToast(json.error || 'Failed to sync with Jira.', 'error');
             }
         } catch (error) {
             console.error("Jira sync failed", error);
+            showToast('A network error occurred while syncing.', 'error');
         }
         setSyncingJira(false);
     };
@@ -107,6 +114,7 @@ export default function Dashboard() {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
+                    document_id: doc.id,
                     action_items: doc.action_items,
                     circular_title: doc.title,
                     circular_url: doc.source_url
@@ -115,12 +123,15 @@ export default function Dashboard() {
             const json = await res.json();
             if (json.success) {
                 setTicketResults(json.tickets);
+                showToast(`Successfully created ${json.tickets.length} Jira tickets.`, 'success');
+                // Refresh list so tracking starts
+                fetchDocuments();
             } else {
-                // Jira not configured — show helpful message
-                alert(json.error || 'Failed to create tickets.');
+                showToast(json.error || 'Failed to create tickets.', 'error');
             }
         } catch (err) {
             console.error('Ticket creation failed', err);
+            showToast('A network error occurred creating tickets.', 'error');
         }
         setCreatingTickets(false);
     };
@@ -170,8 +181,22 @@ export default function Dashboard() {
     };
 
     return (
-        <div className="min-h-screen bg-[#f8fafc] text-slate-800 font-sans flex flex-col p-4 md:p-6 lg:px-8 xl:px-12 max-w-[1600px] mx-auto">
+        <div className="min-h-screen bg-[#f8fafc] text-slate-800 font-sans flex flex-col p-4 md:p-6 lg:px-8 xl:px-12 max-w-[1600px] mx-auto relative">
             
+            {/* Custom Toast Notification */}
+            {toast && (
+                <div className={`fixed top-6 right-6 z-50 px-6 py-4 rounded-xl shadow-2xl border flex items-center gap-3 transition-all animate-bounce-in max-w-sm
+                    ${toast.type === 'success' ? 'bg-emerald-50 border-emerald-200 text-emerald-800 shadow-emerald-500/10' : 
+                      toast.type === 'error' ? 'bg-red-50 border-red-200 text-red-800 shadow-red-500/10' : 
+                      'bg-slate-900 border-slate-700 text-white shadow-slate-900/20'}`}
+                >
+                    {toast.type === 'success' && <CheckCircle2 className="w-5 h-5 text-emerald-500" />}
+                    {toast.type === 'error' && <AlertTriangle className="w-5 h-5 text-red-500" />}
+                    {toast.type === 'info' && <Info className="w-5 h-5 text-slate-300" />}
+                    <p className="font-semibold text-sm leading-snug">{toast.message}</p>
+                </div>
+            )}
+
             {/* Header */}
             <header className="flex justify-between items-center pb-4 border-b border-gray-200 mb-6">
                 <div className="flex items-center gap-3">
@@ -540,6 +565,13 @@ export default function Dashboard() {
                 }
                 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
                     background: #94a3b8;
+                }
+                @keyframes bounce-in {
+                    0% { transform: translateY(-20px) scale(0.9); opacity: 0; }
+                    100% { transform: translateY(0) scale(1); opacity: 1; }
+                }
+                .animate-bounce-in {
+                    animation: bounce-in 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
                 }
             `}} />
         </div>
