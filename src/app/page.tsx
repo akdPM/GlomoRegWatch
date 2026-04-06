@@ -77,10 +77,10 @@ export default function Dashboard() {
             const json = await res.json();
             if (json.success) {
                 if (json.updated_count > 0) {
-                    showToast(`Synced successfully! ${json.updated_count} circular(s) marked as Reviewed.`, 'success');
+                    showToast(`Successfully synced latest real-time status from Jira!`, 'success');
                     await fetchDocuments();
                 } else {
-                    showToast('Jira is completely synced. No pending tickets were marked as Done.', 'info');
+                    showToast('Jira is completely synced. No status changes detected since last sync.', 'info');
                 }
             } else {
                 showToast(json.error || 'Failed to sync with Jira.', 'error');
@@ -148,7 +148,8 @@ export default function Dashboard() {
             return s === 'High';
         }).length,
         unreviewed: documents.filter(d => d.status !== 'reviewed').length,
-        actionItems: documents.reduce((acc, d) => acc + (d.action_items?.length || 0), 0)
+        actionItems: documents.reduce((acc, d) => acc + (d.action_items?.length || 0), 0),
+        completedActionItems: documents.reduce((acc, d) => acc + (d.action_items?.filter((a: any) => ['done', 'closed', 'resolved', 'complete'].includes((a.status || '').toLowerCase())).length || 0), 0)
     };
 
     // Style Helpers
@@ -243,12 +244,21 @@ export default function Dashboard() {
                         <div className="text-sm font-medium text-slate-500">Unreviewed</div>
                     </div>
                 </div>
-                <div className="bg-white rounded-xl p-5 border border-gray-200 shadow-sm flex items-center gap-4">
-                    <div className="text-emerald-500"><CheckCircle2 className="w-6 h-6" /></div>
-                    <div>
-                        <div className="text-2xl font-bold text-slate-900">{stats.actionItems}</div>
-                        <div className="text-sm font-medium text-slate-500">Action Items</div>
+                <div className="bg-white rounded-xl p-5 border border-gray-200 shadow-sm flex items-center gap-4 relative overflow-hidden">
+                    <div className="text-emerald-500"><CheckCircle2 className="w-8 h-8" /></div>
+                    <div className="relative z-10 w-full flex flex-col justify-center">
+                        <div className="flex items-baseline gap-1.5">
+                            <span className="text-2xl font-bold text-slate-900 leading-none">{stats.completedActionItems}</span>
+                            <span className="text-sm font-bold text-slate-400">/ {stats.actionItems}</span>
+                        </div>
+                        <div className="text-sm font-medium text-slate-500 leading-tight mt-1">Actions Completed</div>
                     </div>
+                    {/* Tiny visual progress bar at the bottom */}
+                    {stats.actionItems > 0 && (
+                        <div className="absolute bottom-0 left-0 h-1 bg-emerald-100 w-full">
+                            <div className="h-full bg-emerald-500 transition-all duration-1000" style={{ width: `${(stats.completedActionItems / stats.actionItems) * 100}%` }}></div>
+                        </div>
+                    )}
                 </div>
             </div>
 
