@@ -161,9 +161,15 @@ export default function Dashboard() {
                         <p className="text-xs text-slate-500 font-medium">Regulatory Intelligence • GIFT City</p>
                     </div>
                 </div>
-                <div className="text-sm text-slate-500 flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 text-right">
-                    <span>Last autofetch:</span>
-                    <span className="flex items-center gap-1 whitespace-nowrap"><div className="w-2 h-2 rounded-full bg-emerald-500"></div> {lastSync ? format(new Date(lastSync), 'd MMM, hh:mm a') : 'Never'}</span>
+                <div className="text-sm text-slate-500 flex flex-col items-end gap-1">
+                    <div className="flex items-center gap-2">
+                        <span>Last refreshed:</span>
+                        <span className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-blue-500"></div> {format(new Date(), 'd MMM, hh:mm a')}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <span>Last autofetch:</span>
+                        <span className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-emerald-500"></div> {lastSync ? format(new Date(lastSync), 'd MMM, hh:mm a') : 'Never'}</span>
+                    </div>
                 </div>
             </header>
 
