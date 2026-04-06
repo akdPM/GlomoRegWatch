@@ -64,6 +64,11 @@ export default function Dashboard() {
         fetchDocuments();
     }, [sourceFilter, relevanceFilter, statusFilter]);
 
+    // Clear ticket results when user switches circular
+    useEffect(() => {
+        setTicketResults(null);
+    }, [selectedId]);
+
     const handleIngest = async () => {
         setIngesting(true);
         try {
@@ -146,7 +151,8 @@ export default function Dashboard() {
             const json = await res.json();
             if (json.success) {
                 setTicketResults(json.tickets);
-                showToast(`Successfully created ${json.tickets.length} Jira tickets.`, 'success');
+                const keyList = json.tickets.map((t: any) => t.key).join(', ');
+                showToast(`✅ ${json.tickets.length} Jira tickets created: ${keyList}`, 'success');
                 // Refresh list so tracking starts
                 fetchDocuments();
             } else {
@@ -601,19 +607,6 @@ export default function Dashboard() {
                                             )
                                         )}
                                     </div>
-                                    {ticketResults && ticketResults.length > 0 && !selectedDoc.action_items?.some((a: any) => a.jira_key) && (
-                                        <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4">
-                                            <p className="text-emerald-700 font-semibold text-sm mb-2">✅ {ticketResults.length} Jira ticket{ticketResults.length > 1 ? 's' : ''} created!</p>
-                                            <div className="flex flex-wrap gap-2">
-                                                {ticketResults.map(t => (
-                                                    <a key={t.key} href={t.url} target="_blank" rel="noreferrer"
-                                                        className="text-xs font-bold text-violet-700 bg-violet-100 px-2 py-1 rounded hover:underline">
-                                                        {t.key}
-                                                    </a>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    )}
                                 </div>
                             </div>
                         );
