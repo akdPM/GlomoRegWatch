@@ -549,7 +549,7 @@ export default function Dashboard() {
                                             )
                                         )}
                                     </div>
-                                    {ticketResults && ticketResults.length > 0 && !selectedDoc.action_items.some((a: any) => a.jira_key) && (
+                                    {ticketResults && ticketResults.length > 0 && !selectedDoc.action_items?.some((a: any) => a.jira_key) && (
                                         <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4">
                                             <p className="text-emerald-700 font-semibold text-sm mb-2">✅ {ticketResults.length} Jira ticket{ticketResults.length > 1 ? 's' : ''} created!</p>
                                             <div className="flex flex-wrap gap-2">

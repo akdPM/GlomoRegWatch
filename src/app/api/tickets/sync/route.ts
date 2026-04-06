@@ -17,11 +17,11 @@ export async function POST() {
         console.log("Starting manual Jira sync...");
         const auth = Buffer.from(`${JIRA_EMAIL}:${JIRA_API_TOKEN}`).toString('base64');
 
-        // Get all analyzed documents that might have open Jira tickets
+        // Get all analyzed or reviewed documents that might have open Jira tickets
         const { data: docs } = await supabase
             .from('documents')
             .select('id, title, status, action_items, slack_thread_ts')
-            .eq('status', 'analyzed')
+            .in('status', ['analyzed', 'reviewed'])
             .not('action_items', 'is', null);
 
         if (!docs || docs.length === 0) {
