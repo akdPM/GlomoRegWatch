@@ -53,9 +53,11 @@ export async function POST() {
 
         // 3. HARD LIMIT for Vercel Hobby 60s execution limit (AI takes ~8sec each)
         // Processing more than 5 sequentially guarantees a 504 Timeout on new databases.
-        const processingBatch = backlog.slice(0, 5);
-        const hasMore = backlog.length > 5;
-        console.log(`Discovered ${backlog.length} unprocessed circulars. Processing batch of 5 to respect Vercel limits...`);
+        // On Localhost (development), we bypass this limit so you can backfill instantly.
+        const BATCH_LIMIT = process.env.NODE_ENV === 'development' ? 50 : 5;
+        const processingBatch = backlog.slice(0, BATCH_LIMIT);
+        const hasMore = backlog.length > BATCH_LIMIT;
+        console.log(`Discovered ${backlog.length} unprocessed circulars. Processing batch of ${BATCH_LIMIT}...`);
 
         // 4. Process the batch
         for (const doc of processingBatch) {
@@ -135,7 +137,7 @@ export async function POST() {
             count: newlyAdded.length, 
             new_circulars: newlyAdded,
             has_more: hasMore,
-            message: hasMore ? `Processed 5 circulars. ${backlog.length - 5} remaining in backlog. Click Fetch again as Vercel limits us to 60 seconds!` : `All caught up!`
+            message: hasMore ? `Processed ${BATCH_LIMIT} circulars. ${backlog.length - BATCH_LIMIT} remaining. Click Fetch again as Vercel limits us to 60 seconds!` : `All caught up!`
         });
     } catch (error: any) {
         console.error('Ingestion API error:', error);
